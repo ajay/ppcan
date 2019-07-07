@@ -25,13 +25,13 @@ canDataLock = threading.Lock()
 ###############################################################################
 
 class CanMsg:
-    def __init__(self, id, data, name=None, signals=[]):
+    def __init__(self, id, data, dlc, name=None, signals=[]):
         self.id      = id
         self.name    = name
         self.count   = 0
         self.time    = time.time()
 
-        self.update(data=data, signals=signals)
+        self.update(data=data, dlc=dlc, signals=signals)
 
     @staticmethod
     def bytearrayToAscii(data : bytearray, sep='.') -> str:
@@ -39,19 +39,19 @@ class CanMsg:
 
     @staticmethod
     def headerStrs() -> str:
-        return (['   ID   |               Name               |                Data / Value                |  Ascii   |  Count  |     Time      | Delta (ms)',
-                 '--------|----------------------------------|--------------------------------------------|----------|---------|---------------|-----------'])
+        return (['   ID   | L |               Name                 |                Data / Value                |  Ascii   |  Count  |     Time      | Delta (ms)',
+                 '--------|---|------------------------------------|--------------------------------------------|----------|---------|---------------|-----------'])
 
     def __str__(self):
         dataStr = binascii.hexlify(self.data).decode().upper()
         dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
 
-        classStr  = ' {:6} | {:32} | {:42} | {:8} | {:7} | {:.2f} | {:8.2f}'.format(hex(self.id), str(self.name) if self.name else '', dataStr, self.ascii, self.count, self.time, self.delta)
+        classStr  = ' {:6} | {:1} | {:34.34} | {:42} | {:8} | {:7} | {:.2f} | {:8.2f}'.format(hex(self.id), self.dlc, str(self.name) if self.name else '', dataStr, self.ascii, self.count, self.time, self.delta)
         classStr += '\n' + '\n'.join([str(s) for s in self.signals]) + ('\n' if self.signals else '')
 
         return classStr
 
-    def update(self, data, signals):
+    def update(self, data, dlc, signals):
         currTime     = time.time()
         self.delta   = (currTime - self.time) * 1000 # ms
         self.time    = currTime
@@ -59,6 +59,7 @@ class CanMsg:
 
         self.data    = data
         self.ascii   = self.bytearrayToAscii(self.data)
+        self.dlc     = dlc
         self.signals = signals
 
 
@@ -75,7 +76,7 @@ class CanSignal:
     def __str__(self):
         valueStr = '{:0.2f}'.format(self.value) if isinstance(self.value, float) else str(self.value)
 
-        return ' {:>6} | {:32} | {:<33} {:>8} |'.format('>', self.name, valueStr, self.unit if self.unit else '')
+        return ' {:6} | {:1} | ↳ {:32.32} | {:<33.33} {:>8} |'.format('', '', self.name, valueStr, self.unit if self.unit else '')
 
     def decodeEnums(self):
         if self.enums:
@@ -144,10 +145,12 @@ def receiveCan(canChannel, dbcFile):
         if msg.arbitration_id not in canData:
             canData[msg.arbitration_id] = CanMsg(id=decodedMsg['id'],
                                                  data=decodedMsg['raw_data'],
+                                                 dlc=msg.dlc,
                                                  name=decodedMsg['name'],
                                                  signals=canetonSignalsToObj(msgId=decodedMsg['id'], rawSignals=decodedMsg['signals'], dbcJson=dbcJson))
         else:
             canData[msg.arbitration_id].update(data=decodedMsg['raw_data'],
+                                               dlc=msg.dlc,
                                                signals=canetonSignalsToObj(msgId=decodedMsg['id'], rawSignals=decodedMsg['signals'], dbcJson=dbcJson))
 
         canDataLock.release()
