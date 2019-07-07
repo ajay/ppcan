@@ -35,9 +35,10 @@ class CanMsg:
         self.count   = 1
 
     @staticmethod
-    def indexStr() -> str:
-        return ('  ID   |               Name               |                Data / Value                |  Count  |     Time      | Delta (ms)\n' +
-                '-------|----------------------------------|--------------------------------------------|---------|---------------|-----------')
+    def headerStrs() -> str:
+        return (['  ID   |               Name               |                Data / Value                |  Count  |     Time      | Delta (ms)',
+                 '-------|----------------------------------|--------------------------------------------|---------|---------------|-----------'])
+
     def __str__(self):
         dataStr = binascii.hexlify(self.data).decode().upper()
         dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
@@ -156,6 +157,8 @@ def pcanCursesGui(stdscr):
     padY      = 0
     padHeight = 5000
 
+    headerStrIndex = 2
+
     key = 0
 
     stdscr.clear()
@@ -174,7 +177,9 @@ def pcanCursesGui(stdscr):
 
         key = stdscr.getch()
 
-        if   key == curses.KEY_DOWN:
+        if   key == curses.KEY_RESIZE:
+            continue
+        elif key == curses.KEY_DOWN:
             padY += 1
         elif key == curses.KEY_UP:
             padY -= 1
@@ -194,7 +199,9 @@ def pcanCursesGui(stdscr):
         stdscr.addnstr(0, 0, titleStr.ljust(width), width)
         stdscr.attroff(curses.color_pair(3))
 
-        stdscr.addstr(2, 0, CanMsg.indexStr())
+        # Header
+        for i in range(headerStrIndex, headerStrIndex + len(CanMsg.headerStrs())):
+            stdscr.addnstr(i, 0, CanMsg.headerStrs()[i-headerStrIndex], width)
 
         # Bottom status bar
         stdscr.attron(curses.color_pair(3))
@@ -207,7 +214,7 @@ def pcanCursesGui(stdscr):
         pad.addstr(''.join([str(canData[id]) for id in sorted(canData.keys())]))
         canDataLock.release()
 
-        pad.refresh(padY,0, 4,0, height-3,200)
+        pad.refresh(padY,0, 4,0, height-3,width-1)
         stdscr.refresh()
 
 ###############################################################################
