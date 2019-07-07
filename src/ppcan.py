@@ -27,35 +27,39 @@ canDataLock = threading.Lock()
 class CanMsg:
     def __init__(self, id, data, name=None, signals=[]):
         self.id      = id
-        self.data    = data
         self.name    = name
-        self.signals = signals
-        self.delta   = 0
+        self.count   = 0
         self.time    = time.time()
-        self.count   = 1
+
+        self.update(data=data, signals=signals)
+
+    @staticmethod
+    def bytearrayToAscii(data : bytearray, sep='.') -> str:
+        return ''.join([chr(b) if 32 < b < 127 else sep for b in data])
 
     @staticmethod
     def headerStrs() -> str:
-        return (['  ID   |               Name               |                Data / Value                |  Count  |     Time      | Delta (ms)',
-                 '-------|----------------------------------|--------------------------------------------|---------|---------------|-----------'])
+        return (['  ID   |               Name               |                Data / Value                |  Ascii   |  Count  |     Time      | Delta (ms)',
+                 '-------|----------------------------------|--------------------------------------------|----------|---------|---------------|-----------'])
 
     def __str__(self):
         dataStr = binascii.hexlify(self.data).decode().upper()
         dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
 
-        classStr  = '{:6} | {:32} | {:42} | {:7} | {:.2f} | {:8.2f}'.format(hex(self.id), str(self.name) if self.name else '', dataStr, self.count, self.time, self.delta)
+        classStr  = '{:6} | {:32} | {:42} | {:8} | {:7} | {:.2f} | {:8.2f}'.format(hex(self.id), str(self.name) if self.name else '', dataStr, self.ascii, self.count, self.time, self.delta)
         classStr += '\n' + '\n'.join([str(s) for s in self.signals]) + ('\n' if self.signals else '')
 
         return classStr
 
     def update(self, data, signals):
-        self.data    = data
-        self.signals = signals
-
         currTime     = time.time()
         self.delta   = (currTime - self.time) * 1000 # ms
         self.time    = currTime
         self.count  += 1
+
+        self.data    = data
+        self.ascii   = self.bytearrayToAscii(self.data)
+        self.signals = signals
 
 
 class CanSignal:
@@ -71,7 +75,7 @@ class CanSignal:
     def __str__(self):
         valueStr = '{:0.2f}'.format(self.value) if isinstance(self.value, float) else str(self.value)
 
-        return ' [sig] | {:32} | {:<33} {:>8} |'.format(self.name, valueStr, self.unit if self.unit else '')
+        return '  -->  | {:32} | {:<33} {:>8} |'.format(self.name, valueStr, self.unit if self.unit else '')
 
     def decodeEnums(self):
         if self.enums:
