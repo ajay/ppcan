@@ -151,15 +151,14 @@ def receiveCan(canChannel, dbcFile):
 ###############################################################################
 
 def pcanCursesGui(stdscr):
-    badKeys  = [-1, 0, ord('\t'), ord('\r'), ord('\n')]
-    titleStr = 'Python PCAN!'
+    # constants
+    badKeys      = [-1, 0, ord('\t'), ord('\r'), ord('\n')]
+    titleStr     = 'Python PCAN!'
+    padHeight    = 5000
+    headerStrIdx = 2
 
-    padY      = 0
-    padHeight = 5000
-
-    headerStrIndex = 2
-
-    key = 0
+    padY = 0
+    key  = 0
 
     stdscr.clear()
     stdscr.refresh()
@@ -200,8 +199,8 @@ def pcanCursesGui(stdscr):
         stdscr.attroff(curses.color_pair(3))
 
         # Header
-        for i in range(headerStrIndex, headerStrIndex + len(CanMsg.headerStrs())):
-            stdscr.addnstr(i, 0, CanMsg.headerStrs()[i-headerStrIndex], width)
+        for i in range(headerStrIdx, headerStrIdx + len(CanMsg.headerStrs())):
+            stdscr.addnstr(i, 0, CanMsg.headerStrs()[i-headerStrIdx], width)
 
         # Bottom status bar
         stdscr.attron(curses.color_pair(3))
