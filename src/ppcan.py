@@ -34,13 +34,13 @@ class CanMsg:
 
     @staticmethod
     def indexStr() -> str:
-        return ('  ID   |               Name               |           Data / Value           |  Count  |     Time      | Delta (ms)\n' +
-                '-------|----------------------------------|----------------------------------|---------|---------------|-----------')
+        return ('  ID   |               Name               |                Data / Value                |  Count  |     Time      | Delta (ms)\n' +
+                '-------|----------------------------------|--------------------------------------------|---------|---------------|-----------')
     def __str__(self):
         dataStr = binascii.hexlify(self.data).decode().upper()
         dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
 
-        classStr  = '{:6} | {:32} | {:32} | {:7} | {:.2f} | {:8.2f}'.format(hex(self.id), str(self.name) if self.name else '', dataStr, self.count, self.time, self.delta)
+        classStr  = '{:6} | {:32} | {:42} | {:7} | {:.2f} | {:8.2f}'.format(hex(self.id), str(self.name) if self.name else '', dataStr, self.count, self.time, self.delta)
         classStr += '\n' + '\n'.join([str(s) for s in self.signals]) + ('\n' if self.signals else '')
 
         return classStr
@@ -56,15 +56,26 @@ class CanMsg:
 
 
 class CanSignal:
-    def __init__(self, name, value, unit=None):
+    def __init__(self, name, value, unit=None, enums=None):
         self.name  = name
         self.value = value
+        self.raw   = value
         self.unit  = unit
+        self.enums = enums
+
+        self.decodeEnums()
 
     def __str__(self):
         valueStr = '{:0.2f}'.format(self.value) if isinstance(self.value, float) else str(self.value)
 
-        return ' [sig] | {:32} | {:<23} {:>8} |'.format(self.name, valueStr, self.unit if self.unit else '')
+        return ' [sig] | {:32} | {:<33} {:>8} |'.format(self.name, valueStr, self.unit if self.unit else '')
+
+    def decodeEnums(self):
+        if self.enums:
+            value = str(int(self.value))
+
+            if value in self.enums:
+                self.value = self.enums[value]
 
 
 class CanDbcJson:
@@ -72,12 +83,22 @@ class CanDbcJson:
         self.path = path
         self.data = json.loads(open(self.path).read())
 
+    def msgData(self, msgId : int):
+        return self.data['messages'][str(msgId)]
+
+    def signalData(self, msgId : int, signal : str):
+        return self.msgData(msgId)['signals'][signal]
+
+    def signalEnums(self, msgId : int, signal : str):
+        signalData = self.signalData(msgId, signal)
+        return signalData['enums'] if 'enums' in signalData else None
+
 ###############################################################################
 
 def receiveCan(canChannel, dbcJsonFile):
 
-    def canetonSignalsToObj(rawSignals : list) -> list:
-        return [CanSignal(name=s['name'], value=s['value'], unit=s['unit']) for s in filter(lambda x: x, rawSignals)]
+    def canetonSignalsToObj(msgId : int, rawSignals : list, dbcJson : CanDbcJson) -> list:
+        return [CanSignal(name=s['name'], value=s['value'], unit=s['unit'], enums=dbcJson.signalEnums(msgId=msgId, signal=s['name'])) for s in filter(lambda x: x, rawSignals)]
 
     bus     = can.interfaces.socketcan.SocketcanBus(channel=canChannel)
     dbcJson = CanDbcJson(path=dbcJsonFile)
@@ -105,10 +126,10 @@ def receiveCan(canChannel, dbcJsonFile):
             canData[msg.arbitration_id] = CanMsg(id=decodedMsg['id'],
                                                  data=decodedMsg['raw_data'],
                                                  name=decodedMsg['name'],
-                                                 signals=canetonSignalsToObj(decodedMsg['signals']))
+                                                 signals=canetonSignalsToObj(msgId=decodedMsg['id'], rawSignals=decodedMsg['signals'], dbcJson=dbcJson))
         else:
             canData[msg.arbitration_id].update(data=decodedMsg['raw_data'],
-                                               signals=canetonSignalsToObj(decodedMsg['signals']))
+                                               signals=canetonSignalsToObj(msgId=decodedMsg['id'], rawSignals=decodedMsg['signals'], dbcJson=dbcJson))
 
         canDataLock.release()
 
