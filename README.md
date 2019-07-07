@@ -1,10 +1,10 @@
 # PPCAN - Python PCAN
 
 ## Installation / Dependencies
-`dbc2json` (from [libcanardbc](https://github.com/Polyconseil/libcanardbc)) deps:
+#### `dbc2json` (from [libcanardbc](https://github.com/Polyconseil/libcanardbc)) deps:
 `sudo apt install automake autoconf libtool flex bison libjson-glib-dev`
 
-`ppcan.py` deps:
+#### `ppcan.py` deps:
 `python3 -m pip install -r requirements.txt`
 
 ## Usage
