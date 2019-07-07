@@ -21,6 +21,7 @@ import colorama
 
 canData     = {}
 canDataLock = threading.Lock()
+pause       = False
 
 ###############################################################################
 
@@ -113,6 +114,33 @@ class CanDbcJson:
         signalData = self.signalData(msgId, signal)
         return signalData['enums'] if 'enums' in signalData else None
 
+
+class GoSequence:
+    # def __init__(self, interval, seq=['-', '\\', '|', '/']):
+    # def __init__(self, interval, seq=['▖', '▘', '▝', '▗']):
+    # def __init__(self, interval, seq=['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█', '▇', '▆', '▅', '▄', '▃', '▁']):
+    # def __init__(self, interval, seq=['┤', '┘', '┴', '└', '├', '┌', '┬', '┐']):
+    # def __init__(self, interval, seq=['◢', '◣', '◤', '◥']):
+    # def __init__(self, interval, seq=['◡◡', '⊙⊙', '◠◠']):
+    # def __init__(self, interval, seq=['▉', '▊', '▋', '▌', '▍', '▎', '▏', '▎', '▍', '▌', '▋', '▊', '▉']):
+    # def __init__(self, interval, seq=['◴', '◷', '◶', '◵']):
+    # def __init__(self, interval, seq=['◐', '◓', '◑', '◒']):
+    def __init__(self, interval, seq=['⠁', '⠂', '⠄', '⡀', '⢀', '⠠', '⠐', '⠈']):
+        self.interval = interval # ms
+        self.seq      = seq
+        self.timer    = time.time()
+        self.index    = 0
+
+    def get(self):
+        currTime = time.time()
+        if ((currTime - self.timer) * 1000) > self.interval:
+            self.timer = currTime
+            self.index = (self.index + 1) % len(self.seq)
+        return self.getLast()
+
+    def getLast(self):
+        return self.seq[self.index]
+
 ###############################################################################
 
 def receiveCan(canChannel, dbcFile):
@@ -124,6 +152,9 @@ def receiveCan(canChannel, dbcFile):
     dbcJson = CanDbcJson(dbcPath=dbcFile)
 
     while True:
+        if pause:
+            continue
+
         msg = bus.recv()
 
         try:
@@ -158,14 +189,16 @@ def receiveCan(canChannel, dbcFile):
 ###############################################################################
 
 def pcanCursesGui(stdscr):
-    # constants
+    global pause
+
     badKeys      = [-1, 0, ord('\t'), ord('\r'), ord('\n')]
     titleStr     = 'Python PCAN!'
     padHeight    = 5000
     headerStrIdx = 2
 
-    padY = 0
-    key  = 0
+    padY  = 0
+    key   = 0
+    goSeq = GoSequence(interval=100)
 
     stdscr.clear()
     stdscr.refresh()
@@ -193,12 +226,19 @@ def pcanCursesGui(stdscr):
             padY += height
         elif key == curses.KEY_LEFT  or key == curses.KEY_PPAGE:
             padY -= height
+        elif key == ord('p'):
+            pause = True
+        elif key == ord('r'):
+            pause = False
 
         padY = max(0, min(padHeight-height, padY))
 
         key = ord('0') if key in badKeys else key
 
-        statusbarStr = "Press 'q' to quit | {} / {} | '{}' ({})".format(padY, padHeight, chr(key), key)
+        statusbarStr = " {} | Press 'q' to quit | {:19} | {} / {} | '{}' ({})".format(goSeq.getLast()       if pause else goSeq.get(),
+                                                                                      "Press 'r' to resume" if pause else "Press 'p' to pause",
+                                                                                      padY, padHeight,
+                                                                                      chr(key), key)
 
         # Top status bar
         stdscr.attron(curses.color_pair(3))
