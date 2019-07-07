@@ -7,7 +7,9 @@ import curses
 import json
 import os
 import signal
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 
@@ -79,9 +81,21 @@ class CanSignal:
 
 
 class CanDbcJson:
-    def __init__(self, path):
-        self.path = path
-        self.data = json.loads(open(self.path).read())
+    def __init__(self, dbcPath):
+        self.dbcPath = dbcPath
+
+        origCwd = os.getcwd()
+
+        tempUtf8Dbc = tempfile.NamedTemporaryFile(mode='w+', encoding='utf-8')
+        tempUtf8Dbc.write(open(self.dbcPath).read())
+
+        tempDbcJson = tempfile.NamedTemporaryFile(mode='w+', encoding='utf-8')
+        os.chdir(os.path.dirname(os.path.abspath(__file__)))
+        subprocess.call(['./dbc2json', tempUtf8Dbc.name, tempDbcJson.name], stdout=open(os.devnull, 'wb'))
+
+        os.chdir(origCwd)
+
+        self.data = json.loads(open(tempDbcJson.name).read())
 
     def msgData(self, msgId : int):
         return self.data['messages'][str(msgId)]
@@ -95,13 +109,13 @@ class CanDbcJson:
 
 ###############################################################################
 
-def receiveCan(canChannel, dbcJsonFile):
+def receiveCan(canChannel, dbcFile):
 
     def canetonSignalsToObj(msgId : int, rawSignals : list, dbcJson : CanDbcJson) -> list:
         return [CanSignal(name=s['name'], value=s['value'], unit=s['unit'], enums=dbcJson.signalEnums(msgId=msgId, signal=s['name'])) for s in filter(lambda x: x, rawSignals)]
 
     bus     = can.interfaces.socketcan.SocketcanBus(channel=canChannel)
-    dbcJson = CanDbcJson(path=dbcJsonFile)
+    dbcJson = CanDbcJson(dbcPath=dbcFile)
 
     while True:
         msg = bus.recv()
@@ -142,7 +156,7 @@ def pcanCursesGui(stdscr):
     padY      = 0
     padHeight = 5000
 
-    key  = 0
+    key = 0
 
     stdscr.clear()
     stdscr.refresh()
@@ -154,7 +168,7 @@ def pcanCursesGui(stdscr):
     curses.init_pair(2, curses.COLOR_RED,   curses.COLOR_BLACK)
     curses.init_pair(3, curses.COLOR_BLACK, curses.COLOR_WHITE)
 
-    while (key != ord('q') and key != 27): # 27 is escape, not defined in curses
+    while (key != ord('q')):
 
         height, width = stdscr.getmaxyx()
 
@@ -206,15 +220,16 @@ def sigIntHandler(signal, frame):
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description='Python PCAN')
-    parser.add_argument('-c', '--can_channel',  help='SocketCAN can channel',            required=True)
-    parser.add_argument('-j', '--can_dbc_json', help='JSON generated from CAN dbc file', required=True)
+    parser = argparse.ArgumentParser(description='Python PCAN!')
+    requiredArgs = parser.add_argument_group('required arguments')
+    requiredArgs.add_argument('-c', '--can_channel', help='Initialized SocketCAN CAN channel (i.e. can0, can1, vcan0, etc...)', required=True)
+    requiredArgs.add_argument('-d', '--can_dbc',     help='CAN DBC file',                                                       required=True)
 
     args = parser.parse_args()
 
     signal.signal(signal.SIGINT, sigIntHandler)
 
-    receiveCanThread = threading.Thread(target=receiveCan, daemon=True, args=(args.can_channel, args.can_dbc_json))
+    receiveCanThread = threading.Thread(target=receiveCan, daemon=True, args=(args.can_channel, args.can_dbc))
     receiveCanThread.start()
 
     curses.wrapper(pcanCursesGui)
