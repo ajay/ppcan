@@ -32,7 +32,6 @@ class CanMsg:
     def indexStr() -> str:
         return ('  ID   |               Name               |           Data / Value           |  Count  |     Time      | Delta (ms)\n' +
                 '-------|----------------------------------|----------------------------------|---------|---------------|-----------')
-
     def __str__(self):
         dataStr = binascii.hexlify(self.data).decode().upper()
         dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
@@ -62,6 +61,51 @@ class CanSignal:
         valueStr = '{:0.2f}'.format(self.value) if isinstance(self.value, float) else str(self.value)
 
         return ' [sig] | {:32} | {:<23} {:>8} |'.format(self.name, valueStr, self.unit if self.unit else '')
+
+
+class CanDbcJson:
+    def __init__(self, path):
+        self.path = path
+        self.data = json.loads(open(self.path).read())
+
+
+def receiveCan(canChannel, dbcJsonFile):
+
+    def canetonSignalsToObj(rawSignals : list) -> list:
+        return [CanSignal(name=s['name'], value=s['value'], unit=s['unit']) for s in filter(lambda x: x, rawSignals)]
+
+    bus     = can.interfaces.socketcan.SocketcanBus(channel=canChannel)
+    dbcJson = CanDbcJson(path=dbcJsonFile)
+
+    while True:
+        msg = bus.recv()
+
+        try:
+            decodedMsg = caneton.message_decode(message_id=msg.arbitration_id,
+                                                message_length=msg.dlc,
+                                                message_data=msg.data,
+                                                dbc_json=dbcJson.data)
+        except (caneton.exceptions.MessageNotFound, caneton.exceptions.DecodingError):
+            decodedMsg = {
+                'id'                : msg.arbitration_id,
+                'multiplexing_mode' : None,
+                'name'              : None,
+                'raw_data'          : msg.data,
+                'signals'           : [None]
+            }
+
+        canDataLock.acquire()
+
+        if msg.arbitration_id not in canData:
+            canData[msg.arbitration_id] = CanMsg(id=decodedMsg['id'],
+                                                 data=decodedMsg['raw_data'],
+                                                 name=decodedMsg['name'],
+                                                 signals=canetonSignalsToObj(decodedMsg['signals']))
+        else:
+            canData[msg.arbitration_id].update(data=decodedMsg['raw_data'],
+                                               signals=canetonSignalsToObj(decodedMsg['signals']))
+
+        canDataLock.release()
 
 
 def run(stdscr):
@@ -124,45 +168,6 @@ def run(stdscr):
 
         pad.refresh(padY,0, 4,0, height-3,200)
         stdscr.refresh()
-
-
-def receiveCan(canChannel, dbcJson):
-
-    def canetonSignalsToObj(rawSignals : list) -> list:
-        return [CanSignal(name=s['name'], value=s['value'], unit=s['unit']) for s in filter(lambda x: x, rawSignals)]
-
-    bus     = can.interfaces.socketcan.SocketcanBus(channel=canChannel)
-    dbcJson = json.loads(open(dbcJson).read())
-
-    while True:
-        msg = bus.recv()
-
-        try:
-            decodedMsg = caneton.message_decode(message_id=msg.arbitration_id,
-                                                message_length=msg.dlc,
-                                                message_data=msg.data,
-                                                dbc_json=dbcJson)
-        except (caneton.exceptions.MessageNotFound, caneton.exceptions.DecodingError):
-            decodedMsg = {
-                'id'                : msg.arbitration_id,
-                'multiplexing_mode' : None,
-                'name'              : None,
-                'raw_data'          : msg.data,
-                'signals'           : [None]
-            }
-
-        canDataLock.acquire()
-
-        if msg.arbitration_id not in canData:
-            canData[msg.arbitration_id] = CanMsg(id=decodedMsg['id'],
-                                                 data=decodedMsg['raw_data'],
-                                                 name=decodedMsg['name'],
-                                                 signals=canetonSignalsToObj(decodedMsg['signals']))
-        else:
-            canData[msg.arbitration_id].update(data=decodedMsg['raw_data'],
-                                               signals=canetonSignalsToObj(decodedMsg['signals']))
-
-        canDataLock.release()
 
 
 def sigIntHandler(signal, frame):
