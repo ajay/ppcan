@@ -4,12 +4,12 @@
 #### `dbc2json` (from [libcanardbc](https://github.com/Polyconseil/libcanardbc)) deps:
 `sudo apt install automake autoconf libtool flex bison libjson-glib-dev`
 
-#### `ppcan.py` deps:
+#### `ppcan` deps:
 `python3 -m pip install -r requirements.txt`
 
 ## Usage
 ```
-usage: ppcan.py [-h] -c CAN_CHANNEL -d CAN_DBC
+usage: ppcan [-h] -c CAN_CHANNEL -d CAN_DBC
 
 Python PCAN!
 
