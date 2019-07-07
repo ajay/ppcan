@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 
+###############################################################################
+
 import binascii
 import curses
 import json
@@ -13,10 +15,12 @@ import can
 import caneton
 import colorama
 
+###############################################################################
 
 canData     = {}
 canDataLock = threading.Lock()
 
+###############################################################################
 
 class CanMsg:
     def __init__(self, id, data, name=None, signals=[]):
@@ -68,6 +72,7 @@ class CanDbcJson:
         self.path = path
         self.data = json.loads(open(self.path).read())
 
+###############################################################################
 
 def receiveCan(canChannel, dbcJsonFile):
 
@@ -107,8 +112,9 @@ def receiveCan(canChannel, dbcJsonFile):
 
         canDataLock.release()
 
+###############################################################################
 
-def run(stdscr):
+def pcanCursesGui(stdscr):
     badKeys  = [-1, 0, ord('\t'), ord('\r'), ord('\n')]
     titleStr = 'Python PCAN!'
 
@@ -169,6 +175,7 @@ def run(stdscr):
         pad.refresh(padY,0, 4,0, height-3,200)
         stdscr.refresh()
 
+###############################################################################
 
 def sigIntHandler(signal, frame):
     print('{}{}\n\nExiting {} ...\n{}'.format(colorama.Fore.BLUE, colorama.Style.BRIGHT, str(__file__), colorama.Style.RESET_ALL))
@@ -189,7 +196,7 @@ def main():
     receiveCanThread = threading.Thread(target=receiveCan, daemon=True, args=(args.can_channel, args.can_dbc_json))
     receiveCanThread.start()
 
-    curses.wrapper(run)
+    curses.wrapper(pcanCursesGui)
 
 
 if __name__ =='__main__':
