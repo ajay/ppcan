@@ -26,17 +26,18 @@ class CanMsg:
         self.signals = signals
         self.delta   = 0
         self.time    = time.time()
+        self.count   = 1
 
     @staticmethod
     def indexStr() -> str:
-        return ('  ID   |               Name               |           Data / Value           |     Time      | Delta (ms)\n' +
-                '-------|----------------------------------|----------------------------------|---------------|-----------')
+        return ('  ID   |               Name               |           Data / Value           |  Count  |     Time      | Delta (ms)\n' +
+                '-------|----------------------------------|----------------------------------|---------|---------------|-----------')
 
     def __str__(self):
         dataStr = binascii.hexlify(self.data).decode().upper()
         dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
 
-        classStr  = '{:6} | {:32} | {:32} | {:.2f} | {:8.2f}'.format(hex(self.id), str(self.name) if self.name else '', dataStr, self.time, self.delta)
+        classStr  = '{:6} | {:32} | {:32} | {:7} | {:.2f} | {:8.2f}'.format(hex(self.id), str(self.name) if self.name else '', dataStr, self.count, self.time, self.delta)
         classStr += '\n' + '\n'.join([str(s) for s in self.signals]) + ('\n' if self.signals else '')
 
         return classStr
@@ -48,6 +49,7 @@ class CanMsg:
         currTime     = time.time()
         self.delta   = (currTime - self.time) * 1000 # ms
         self.time    = currTime
+        self.count  += 1
 
 
 class CanSignal:
@@ -66,7 +68,9 @@ def run(stdscr):
     badKeys  = [-1, 0, ord('\t'), ord('\r'), ord('\n')]
     titleStr = 'Python PCAN!'
 
-    padY = 0
+    padY      = 0
+    padHeight = 5000
+
     key  = 0
 
     stdscr.clear()
@@ -94,11 +98,11 @@ def run(stdscr):
         elif key == curses.KEY_LEFT  or key == curses.KEY_PPAGE:
             padY -= height
 
-        padY = max(0, min(2000-height, padY))
+        padY = max(0, min(padHeight-height, padY))
 
         key = ord('0') if key in badKeys else key
 
-        statusbarStr = "Press 'q' to quit | {} / {} | '{}' ({})".format(padY, 2000, chr(key), key)
+        statusbarStr = "Press 'q' to quit | {} / {} | '{}' ({})".format(padY, padHeight, chr(key), key)
 
         # Top status bar
         stdscr.attron(curses.color_pair(3))
@@ -112,7 +116,7 @@ def run(stdscr):
         stdscr.addnstr(height-1, 0, statusbarStr.ljust(width-1), width)
         stdscr.attroff(curses.color_pair(3))
 
-        pad = curses.newpad(2000, 200)
+        pad = curses.newpad(padHeight, 200)
 
         canDataLock.acquire()
         pad.addstr(''.join([str(canData[id]) for id in sorted(canData.keys())]))
