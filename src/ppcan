@@ -40,20 +40,6 @@ class CanMsg:
     def bytearrayToAscii(data : bytearray, sep='.') -> str:
         return ''.join([chr(b) if 32 < b < 127 else sep for b in data])
 
-    @staticmethod
-    def headerStrs() -> str:
-        return (['   ID   | L |                Name                 |                Data / Value                |  Ascii   |  Count  |     Time      | Delta (ms)',
-                 '--------|---|-------------------------------------|--------------------------------------------|----------|---------|---------------|-----------'])
-
-    def __str__(self):
-        dataStr = binascii.hexlify(self.data).decode().upper()
-        dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
-
-        classStr  = ' {:6} | {:1} | {:35.35} | {:42} | {:8} | {:7} | {:.2f} | {:8.2f}\n'.format(hex(self.id), self.dlc, str(self.name) if self.name else '', dataStr, self.ascii, self.count, self.time, self.delta)
-        classStr += '\n'.join([str(s) for s in self.signals]) + ('\n' if self.signals else '') if self.showSig else ''
-
-        return classStr
-
     def update(self, data, dlc, signals):
         currTime     = time.time()
         self.delta   = (currTime - self.time) * 1000 # ms
@@ -71,6 +57,20 @@ class CanMsg:
     def showSignals(self):
         self.showSig = True
 
+    @staticmethod
+    def headerStrs() -> str:
+        return (['   ID   | L |                Name                 |                Data / Value                |  Ascii   |  Count  |     Time      | Delta (ms)',
+                 '--------|---|-------------------------------------|--------------------------------------------|----------|---------|---------------|-----------'])
+
+    def __str__(self):
+        dataStr = binascii.hexlify(self.data).decode().upper()
+        dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
+
+        classStr  = ' {:6} | {:1} | {:35.35} | {:42} | {:8} | {:7} | {:.2f} | {:8.2f}\n'.format(hex(self.id), self.dlc, str(self.name) if self.name else '', dataStr, self.ascii, self.count, self.time, self.delta)
+        classStr += '\n'.join([str(s) for s in self.signals]) + ('\n' if self.signals else '') if self.showSig else ''
+
+        return classStr
+
 
 class CanSignal:
     def __init__(self, name, value, unit=None, enums=None):
@@ -83,6 +83,11 @@ class CanSignal:
         if self.enums:
             self.decodeEnums()
 
+    def decodeEnums(self):
+        value = str(int(self.value))
+        if value in self.enums:
+            self.value = self.enums[value]
+
     def __str__(self):
         if self.enums and self.value != self.raw:
             valueStr = '{:<3} {}'.format(int(self.raw), self.value)
@@ -94,11 +99,6 @@ class CanSignal:
             valueStr = str(self.value)
 
         return ' {:6} | {:1} |  ↳ {:32.32} | {:<33.33} {:>8} |'.format('', '', self.name, valueStr, self.unit if self.unit else '')
-
-    def decodeEnums(self):
-        value = str(int(self.value))
-        if value in self.enums:
-            self.value = self.enums[value]
 
 
 class CanDbcJson:
@@ -226,6 +226,8 @@ def pcanCursesGui(stdscr, refreshRate):
 
     while (key != ord('q')):
 
+        key = stdscr.getch()
+
         canDataStr = []
         canDataLock.acquire()
         for canId in sorted(canData.keys()):
@@ -239,8 +241,6 @@ def pcanCursesGui(stdscr, refreshRate):
 
         height, width = stdscr.getmaxyx()
         padHeight = max(height, len(canDataStr))
-
-        key = stdscr.getch()
 
         if   key == curses.KEY_RESIZE:
             continue
