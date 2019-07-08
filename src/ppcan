@@ -28,10 +28,10 @@ pause       = False
 
 class CanMsg:
     def __init__(self, id, data, dlc, name=None, signals=[]):
-        self.id      = id
-        self.name    = name
-        self.count   = 0
-        self.time    = time.time()
+        self.id    = id
+        self.name  = name
+        self.count = 0
+        self.time  = time.time()
 
         self.update(data=data, dlc=dlc, signals=signals)
 
@@ -194,12 +194,12 @@ def pcanCursesGui(stdscr, refreshRate):
 
     badKeys      = [-1, 0, ord('\t'), ord('\r'), ord('\n')]
     titleStr     = 'Python PCAN!'
-    padHeight    = 5000
     headerStrIdx = 2
 
-    padY  = 0
-    key   = 0
-    goSeq = GoSequence(interval=100)
+    padHeight = 0
+    padY      = 0
+    key       = 0
+    goSeq     = GoSequence(interval=100)
 
     stdscr.clear()
     stdscr.refresh()
@@ -213,7 +213,12 @@ def pcanCursesGui(stdscr, refreshRate):
 
     while (key != ord('q')):
 
+        canDataLock.acquire()
+        canDataStr = ''.join([str(canData[id]) for id in sorted(canData.keys())]).split('\n')
+        canDataLock.release()
+
         height, width = stdscr.getmaxyx()
+        padHeight = max(height, len(canDataStr))
 
         key = stdscr.getch()
 
@@ -232,9 +237,9 @@ def pcanCursesGui(stdscr, refreshRate):
         elif key == ord('r'):
             pause = False
 
-        padY = max(0, min(padHeight-height, padY))
-
         key = ord('0') if key in badKeys else key
+
+        padY = max(0, min(max(padHeight-height, 0), padY))
 
         statusbarStr = " {} | Press 'q' to quit | {:19} | {} / {} | '{}' ({})".format(goSeq.getLast()       if pause else goSeq.get(),
                                                                                       "Press 'r' to resume" if pause else "Press 'p' to pause",
@@ -256,12 +261,9 @@ def pcanCursesGui(stdscr, refreshRate):
         stdscr.attroff(curses.color_pair(3))
 
         pad = curses.newpad(padHeight, 200)
-
-        canDataLock.acquire()
-        pad.addstr(''.join([str(canData[id]) for id in sorted(canData.keys())]))
-        canDataLock.release()
-
+        pad.addstr('\n'.join(canDataStr))
         pad.refresh(padY,0, 4,0, height-3,width-1)
+
         stdscr.refresh()
 
 ###############################################################################
