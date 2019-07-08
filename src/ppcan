@@ -4,6 +4,7 @@
 
 import binascii
 import curses
+import functools
 import json
 import os
 import signal
@@ -188,7 +189,7 @@ def receiveCan(canChannel, dbcFile):
 
 ###############################################################################
 
-def pcanCursesGui(stdscr):
+def pcanCursesGui(stdscr, refreshRate):
     global pause
 
     badKeys      = [-1, 0, ord('\t'), ord('\r'), ord('\n')]
@@ -203,7 +204,7 @@ def pcanCursesGui(stdscr):
     stdscr.clear()
     stdscr.refresh()
 
-    curses.halfdelay(1)
+    curses.halfdelay(refreshRate // 100)
 
     curses.start_color()
     curses.init_pair(1, curses.COLOR_CYAN,  curses.COLOR_BLACK)
@@ -271,9 +272,21 @@ def sigIntHandler(signal, frame):
 
 
 def main():
+
+    def validateRefreshRate(value):
+        refreshRate = int(value)
+        if refreshRate not in range(100, 25501, 100):
+            raise argparse.ArgumentTypeError('{} is not a multiple of 100ms, or is outside the range 100ms-25500ms'.format(refreshRate))
+        return refreshRate
+
     import argparse
 
     parser = argparse.ArgumentParser(description='Python PCAN!')
+    parser.add_argument('-r', '--refresh_rate',
+        type=validateRefreshRate,
+        default=100,
+        help=('Screen refresh rate in milliseconds, in multiples of 100ms (i.e. 100, 500, 1000, etc...). Slower refresh rates reduce cpu utilization. Possible values are 100ms-25500ms. Default is 100ms.'))
+
     requiredArgs = parser.add_argument_group('required arguments')
     requiredArgs.add_argument('-c', '--can_channel', help='Initialized SocketCAN CAN channel (i.e. can0, can1, vcan0, etc...)', required=True)
     requiredArgs.add_argument('-d', '--can_dbc',     help='CAN DBC file',                                                       required=True)
@@ -285,7 +298,7 @@ def main():
     receiveCanThread = threading.Thread(target=receiveCan, daemon=True, args=(args.can_channel, args.can_dbc))
     receiveCanThread.start()
 
-    curses.wrapper(pcanCursesGui)
+    curses.wrapper(functools.partial(pcanCursesGui, refreshRate=args.refresh_rate))
 
 
 if __name__ =='__main__':
