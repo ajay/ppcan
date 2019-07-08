@@ -42,8 +42,8 @@ class CanMsg:
 
     @staticmethod
     def headerStrs() -> str:
-        return (['   ID   | L |               Name                 |                Data / Value                |  Ascii   |  Count  |     Time      | Delta (ms)',
-                 '--------|---|------------------------------------|--------------------------------------------|----------|---------|---------------|-----------'])
+        return (['   ID   | L |                Name                 |                Data / Value                |  Ascii   |  Count  |     Time      | Delta (ms)',
+                 '--------|---|-------------------------------------|--------------------------------------------|----------|---------|---------------|-----------'])
 
     def __str__(self):
         dataStr = binascii.hexlify(self.data).decode().upper()
@@ -80,19 +80,25 @@ class CanSignal:
         self.unit  = unit
         self.enums = enums
 
-        self.decodeEnums()
+        if self.enums:
+            self.decodeEnums()
 
     def __str__(self):
-        valueStr = '{:0.2f}'.format(self.value) if isinstance(self.value, float) else str(self.value)
+        if self.enums and self.value != self.raw:
+            valueStr = '{:<3} {}'.format(int(self.raw), self.value)
+        elif isinstance(self.value, float) and not self.value.is_integer():
+            valueStr = '{:0.2f}'.format(self.value)
+        elif isinstance(self.value, float) and self.value.is_integer():
+            valueStr = str(int(self.value))
+        else:
+            valueStr = str(self.value)
 
         return ' {:6} | {:1} |  ↳ {:32.32} | {:<33.33} {:>8} |'.format('', '', self.name, valueStr, self.unit if self.unit else '')
 
     def decodeEnums(self):
-        if self.enums:
-            value = str(int(self.value))
-
-            if value in self.enums:
-                self.value = self.enums[value]
+        value = str(int(self.value))
+        if value in self.enums:
+            self.value = self.enums[value]
 
 
 class CanDbcJson:
