@@ -232,6 +232,10 @@ def pcanCursesGui(stdscr, refreshRate):
             padY += height
         elif key == curses.KEY_LEFT  or key == curses.KEY_PPAGE:
             padY -= height
+        elif key == curses.KEY_HOME:
+            padY = 0
+        elif key == curses.KEY_END:
+            padY = padHeight
         elif key == ord('p'):
             pause = True
         elif key == ord('r'):
@@ -239,7 +243,7 @@ def pcanCursesGui(stdscr, refreshRate):
 
         key = ord('0') if key in badKeys else key
 
-        padY = max(0, min(max(padHeight-height, 0), padY))
+        padY = max(0, min(padHeight-height, padY))
 
         statusbarStr = " {} | Press 'q' to quit | {:19} | {} / {} | '{}' ({})".format(goSeq.getLast()       if pause else goSeq.get(),
                                                                                       "Press 'r' to resume" if pause else "Press 'p' to pause",
