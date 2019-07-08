@@ -202,12 +202,13 @@ def receiveCan(canChannel, dbcFile):
 
 ###############################################################################
 
-def pcanCursesGui(stdscr, refreshRate):
+def pcanCursesGui(stdscr, refreshRate, bold=False):
     global pause
 
     badKeys      = [-1, 0, ord('\t'), ord('\r'), ord('\n')]
     titleStr     = 'Python PCAN!'
     headerStrIdx = 2
+    boldAttr     = curses.A_BOLD if bold else 0
 
     padHeight = 0
     padY      = 0
@@ -263,16 +264,16 @@ def pcanCursesGui(stdscr, refreshRate):
                                                                                                                          padY, padHeight,
                                                                                                                          chr(key), key)
 
-        stdscr.addnstr(0, 0, titleStr.ljust(width), width, curses.color_pair(3) | curses.A_BOLD)
+        stdscr.addnstr(0, 0, titleStr.ljust(width), width, curses.color_pair(3) | boldAttr)
 
         for i in range(headerStrIdx, headerStrIdx + len(CanMsg.headerStrs())):
-            stdscr.addnstr(i, 0, CanMsg.headerStrs()[i-headerStrIdx], width, curses.color_pair(0) | curses.A_BOLD)
+            stdscr.addnstr(i, 0, CanMsg.headerStrs()[i-headerStrIdx], width, curses.color_pair(0) | boldAttr)
 
-        stdscr.addnstr(height-1, 0, statusbarStr.ljust(width-1), width, curses.color_pair(3) | curses.A_BOLD)
+        stdscr.addnstr(height-1, 0, statusbarStr.ljust(width-1), width, curses.color_pair(3) | boldAttr)
 
         pad = curses.newpad(padHeight, 200)
         for line in canDataStr:
-            pad.addstr('{}\n'.format(line), curses.color_pair(0) | (curses.A_BOLD if line.startswith(CanMsg.msgStrStart()) else 0))
+            pad.addstr('{}\n'.format(line), curses.color_pair(0) | (boldAttr if line.startswith(CanMsg.msgStrStart()) else 0))
         pad.refresh(padY,0, 4,0, height-3,width-1)
 
         stdscr.refresh()
@@ -299,6 +300,7 @@ def main():
         type=validateRefreshRate,
         default=100,
         help=('Screen refresh rate in milliseconds, in multiples of 100ms (i.e. 100, 500, 1000, etc...). Slower refresh rates reduce cpu utilization. Possible values are 100ms-25500ms. Default is 100ms.'))
+    parser.add_argument('-b', '--bold', action='store_true', help='Display some items in bold for emphasis')
 
     requiredArgs = parser.add_argument_group('required arguments')
     requiredArgs.add_argument('-c', '--can_channel', help='Initialized SocketCAN CAN channel (i.e. can0, can1, vcan0, etc...)', required=True)
@@ -311,7 +313,7 @@ def main():
     receiveCanThread = threading.Thread(target=receiveCan, daemon=True, args=(args.can_channel, args.can_dbc))
     receiveCanThread.start()
 
-    curses.wrapper(functools.partial(pcanCursesGui, refreshRate=args.refresh_rate))
+    curses.wrapper(functools.partial(pcanCursesGui, refreshRate=args.refresh_rate, bold=args.bold))
 
 
 if __name__ =='__main__':
