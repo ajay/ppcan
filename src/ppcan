@@ -28,10 +28,11 @@ pause       = False
 
 class CanMsg:
     def __init__(self, id, data, dlc, name=None, signals=[]):
-        self.id    = id
-        self.name  = name
-        self.count = 0
-        self.time  = time.time()
+        self.id      = id
+        self.name    = name
+        self.count   = 0
+        self.time    = time.time()
+        self.showSig = True
 
         self.update(data=data, dlc=dlc, signals=signals)
 
@@ -48,8 +49,8 @@ class CanMsg:
         dataStr = binascii.hexlify(self.data).decode().upper()
         dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
 
-        classStr  = ' {:6} | {:1} | {:34.34} | {:42} | {:8} | {:7} | {:.2f} | {:8.2f}'.format(hex(self.id), self.dlc, str(self.name) if self.name else '', dataStr, self.ascii, self.count, self.time, self.delta)
-        classStr += '\n' + '\n'.join([str(s) for s in self.signals]) + ('\n' if self.signals else '')
+        classStr  = ' {:6} | {:1} | {:34.34} | {:42} | {:8} | {:7} | {:.2f} | {:8.2f}\n'.format(hex(self.id), self.dlc, str(self.name) if self.name else '', dataStr, self.ascii, self.count, self.time, self.delta)
+        classStr += '\n'.join([str(s) for s in self.signals]) + ('\n' if self.signals else '') if self.showSig else ''
 
         return classStr
 
@@ -63,6 +64,12 @@ class CanMsg:
         self.ascii   = self.bytearrayToAscii(self.data)
         self.dlc     = dlc
         self.signals = signals
+
+    def hideSignals(self):
+        self.showSig = False
+
+    def showSignals(self):
+        self.showSig = True
 
 
 class CanSignal:
@@ -213,9 +220,16 @@ def pcanCursesGui(stdscr, refreshRate):
 
     while (key != ord('q')):
 
+        canDataStr = []
         canDataLock.acquire()
-        canDataStr = ''.join([str(canData[id]) for id in sorted(canData.keys())]).split('\n')
+        for canId in sorted(canData.keys()):
+            if   key == ord('h'):
+                canData[canId].hideSignals()
+            elif key == ord('s'):
+                canData[canId].showSignals()
+            canDataStr.append(str(canData[canId]))
         canDataLock.release()
+        canDataStr = ''.join(canDataStr).split('\n')
 
         height, width = stdscr.getmaxyx()
         padHeight = max(height, len(canDataStr))
@@ -245,10 +259,10 @@ def pcanCursesGui(stdscr, refreshRate):
 
         padY = max(0, min(padHeight-height, padY))
 
-        statusbarStr = " {} | Press 'q' to quit | {:19} | {} / {} | '{}' ({})".format(goSeq.getLast()       if pause else goSeq.get(),
-                                                                                      "Press 'r' to resume" if pause else "Press 'p' to pause",
-                                                                                      padY, padHeight,
-                                                                                      chr(key), key)
+        statusbarStr = " {} | 'q' [quit] | {:12} | 's' [show signals] | 'h' [hide signals] | {} / {} | '{}' ({})".format(goSeq.getLast() if pause else goSeq.get(),
+                                                                                                                         "'r' [resume]"  if pause else "'p' [pause]",
+                                                                                                                         padY, padHeight,
+                                                                                                                         chr(key), key)
 
         # Top status bar
         stdscr.attron(curses.color_pair(3))
