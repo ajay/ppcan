@@ -62,6 +62,10 @@ class CanMsg:
         return (['   ID   | L |                Name                 |                Data / Value                |  Ascii   |  Count  |     Time      | Delta (ms)',
                  '--------|---|-------------------------------------|--------------------------------------------|----------|---------|---------------|-----------'])
 
+    @staticmethod
+    def msgStrStart() -> str:
+        return ' 0x'
+
     def __str__(self):
         dataStr = binascii.hexlify(self.data).decode().upper()
         dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
@@ -89,14 +93,10 @@ class CanSignal:
             self.value = self.enums[value]
 
     def __str__(self):
-        if self.enums and self.value != self.raw:
-            valueStr = '{:<3} {}'.format(int(self.raw), self.value)
-        elif isinstance(self.value, float) and not self.value.is_integer():
-            valueStr = '{:0.2f}'.format(self.value)
-        elif isinstance(self.value, float) and self.value.is_integer():
-            valueStr = str(int(self.value))
-        else:
-            valueStr = str(self.value)
+        if   self.enums and self.value != self.raw:                         valueStr = '{:<3} {}'.format(int(self.raw), self.value)
+        elif isinstance(self.value, float) and not self.value.is_integer(): valueStr = '{:0.2f}'.format(self.value)
+        elif isinstance(self.value, float) and self.value.is_integer():     valueStr = str(int(self.value))
+        else:                                                               valueStr = str(self.value)
 
         return ' {:6} | {:1} |  ↳ {:32.32} | {:<33.33} {:>8} |'.format('', '', self.name, valueStr, self.unit if self.unit else '')
 
@@ -233,33 +233,26 @@ def pcanCursesGui(stdscr, refreshRate):
         for canId in sorted(canData.keys()):
             if   key == ord('h'):
                 canData[canId].hideSignals()
+                stdscr.clear()
             elif key == ord('s'):
                 canData[canId].showSignals()
+                stdscr.clear()
             canDataStr.append(str(canData[canId]))
         canDataLock.release()
         canDataStr = ''.join(canDataStr).split('\n')
 
         height, width = stdscr.getmaxyx()
-        padHeight = max(height, len(canDataStr))
+        padHeight = len(canDataStr) + len(CanMsg.headerStrs())
 
-        if   key == curses.KEY_RESIZE:
-            continue
-        elif key == curses.KEY_DOWN:
-            padY += 1
-        elif key == curses.KEY_UP:
-            padY -= 1
-        elif key == curses.KEY_RIGHT or key == curses.KEY_NPAGE or key == ord(' '):
-            padY += height
-        elif key == curses.KEY_LEFT  or key == curses.KEY_PPAGE:
-            padY -= height
-        elif key == curses.KEY_HOME:
-            padY = 0
-        elif key == curses.KEY_END:
-            padY = padHeight
-        elif key == ord('p'):
-            pause = True
-        elif key == ord('r'):
-            pause = False
+        if   key == curses.KEY_RESIZE:                                               continue
+        elif key == curses.KEY_DOWN:                                                 padY += 1
+        elif key == curses.KEY_UP:                                                   padY -= 1
+        elif key == curses.KEY_RIGHT or key == curses.KEY_NPAGE or key == ord(' '):  padY += height
+        elif key == curses.KEY_LEFT  or key == curses.KEY_PPAGE:                     padY -= height
+        elif key == curses.KEY_HOME:                                                 padY  = 0
+        elif key == curses.KEY_END:                                                  padY  = padHeight
+        elif key == ord('p'):                                                        pause = True
+        elif key == ord('r'):                                                        pause = False
 
         key = ord('0') if key in badKeys else key
 
@@ -270,22 +263,16 @@ def pcanCursesGui(stdscr, refreshRate):
                                                                                                                          padY, padHeight,
                                                                                                                          chr(key), key)
 
-        # Top status bar
-        stdscr.attron(curses.color_pair(3))
-        stdscr.addnstr(0, 0, titleStr.ljust(width), width)
-        stdscr.attroff(curses.color_pair(3))
+        stdscr.addnstr(0, 0, titleStr.ljust(width), width, curses.color_pair(3) | curses.A_BOLD)
 
-        # Header
         for i in range(headerStrIdx, headerStrIdx + len(CanMsg.headerStrs())):
-            stdscr.addnstr(i, 0, CanMsg.headerStrs()[i-headerStrIdx], width)
+            stdscr.addnstr(i, 0, CanMsg.headerStrs()[i-headerStrIdx], width, curses.color_pair(0) | curses.A_BOLD)
 
-        # Bottom status bar
-        stdscr.attron(curses.color_pair(3))
-        stdscr.addnstr(height-1, 0, statusbarStr.ljust(width-1), width)
-        stdscr.attroff(curses.color_pair(3))
+        stdscr.addnstr(height-1, 0, statusbarStr.ljust(width-1), width, curses.color_pair(3) | curses.A_BOLD)
 
         pad = curses.newpad(padHeight, 200)
-        pad.addstr('\n'.join(canDataStr))
+        for line in canDataStr:
+            pad.addstr('{}\n'.format(line), curses.color_pair(0) | (curses.A_BOLD if line.startswith(CanMsg.msgStrStart()) else 0))
         pad.refresh(padY,0, 4,0, height-3,width-1)
 
         stdscr.refresh()
