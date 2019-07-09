@@ -28,11 +28,12 @@ pause       = False
 
 class CanMsg:
     def __init__(self, id, data, dlc, name=None, signals=[], showSig=True):
-        self.id      = id
-        self.name    = name
-        self.count   = 0
-        self.time    = time.time()
-        self.showSig = showSig
+        self.id        = id
+        self.name      = name
+        self.count     = 0
+        self.time      = time.time()
+        self.showSig   = showSig
+        self.startTime = self.time
 
         self.update(data=data, dlc=dlc, signals=signals)
 
@@ -59,8 +60,8 @@ class CanMsg:
 
     @staticmethod
     def headerStrs() -> str:
-        return (['   ID   | L |                Name                 |                Data / Value                |  Ascii   |  Count  |     Time      | Delta (ms)',
-                 '--------|---|-------------------------------------|--------------------------------------------|----------|---------|---------------|-----------'])
+        return (['   ID   | L |                Name                 |                Data / Value                |  Ascii   |  Count  |   Time   | Delta (ms)',
+                 '--------|---|-------------------------------------|--------------------------------------------|----------|---------|----------|-----------'])
 
     @staticmethod
     def msgStrStart() -> str:
@@ -70,7 +71,8 @@ class CanMsg:
         dataStr = binascii.hexlify(self.data).decode().upper()
         dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
 
-        classStr  = ' {:6} | {:1} | {:35.35} | {:42} | {:8} | {:7} | {:.2f} | {:8.2f}\n'.format(hex(self.id), self.dlc, str(self.name) if self.name else '', dataStr, self.ascii, self.count, self.time, self.delta)
+        classStr  = ' {:6} | {:1} | {:35.35} | {:42} | {:8} | {:7} | {:8.2f} | {:8.2f}\n'.format(
+            hex(self.id), self.dlc, str(self.name) if self.name else '', dataStr, self.ascii, self.count, time.time() - self.startTime, self.delta)
         classStr += '\n'.join([str(s) for s in self.signals]) + ('\n' if self.signals else '') if self.showSig else ''
 
         return classStr
