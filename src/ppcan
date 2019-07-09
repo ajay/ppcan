@@ -62,19 +62,21 @@ class CanMsg:
 
     @staticmethod
     def headerStrs() -> str:
-        return (['   ID   | L |                Name                |                Data / Value                |  Ascii   |  Count  |   Time   | Delta (ms)',
-                 '--------|---|------------------------------------|--------------------------------------------|----------|---------|----------|-----------'])
+        return (['    ID    | L |                Name                |                Data / Value                |  Ascii   |  Count  |   Time   | Delta (ms)',
+                 '----------|---|------------------------------------|--------------------------------------------|----------|---------|----------|-----------'])
 
     @staticmethod
     def lineIsMsg(line : str) -> bool:
-        return bool(re.match(r'^ \w+', line))
+        return bool(re.match(r'^ *\w+', line))
 
     def __str__(self):
         dataStr = binascii.hexlify(self.data).decode().upper()
         dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
 
-        classStr = ' {:6} | {:1} | {:34.34} | {:42} | {:8} | {:7} | {:8.2f} | {:8.2f}\n{}'.format(
-            hex((self.id & ~0x80000000) if self.extended else self.id).lstrip('0x').upper(), self.dlc, str(self.name) if self.name else '', dataStr, self.ascii, self.count, time.time() - self.startTime, self.delta,
+        idStr = hex((self.id & ~0x80000000) if self.extended else self.id).lstrip('0x').upper().zfill(8 if self.extended else 3)
+
+        classStr = ' {:^8} | {:1} | {:34.34} | {:42} | {:8} | {:7} | {:8.2f} | {:8.2f}\n{}'.format(
+            idStr, self.dlc, str(self.name) if self.name else '', dataStr, self.ascii, self.count, time.time() - self.startTime, self.delta,
             '\n'.join([str(s) for s in self.signals]) + ('\n' if self.signals else '') if self.showSigs else '')
 
         return classStr
@@ -102,7 +104,7 @@ class CanSignal:
         elif isinstance(self.value, float):          valueStr = ('{:0.' + str(max(self.decimals, 0)) + 'f}').format(self.value)
         else:                                        valueStr = str(self.value)
 
-        return ' {:6} | {:1} |   {:32.32} | {:<35.35} {:>6} |'.format('', '', self.name, valueStr, self.unit if self.unit else '')
+        return ' {:8} | {:1} |   {:32.32} | {:<35.35} {:>6} |'.format('', '', self.name, valueStr, self.unit if self.unit else '')
 
 
 class CanDbcJson:
