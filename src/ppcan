@@ -136,18 +136,23 @@ class CanDbcJson:
 
 
 class GoSequence:
-    # def __init__(self, interval, seq=['-', '\\', '|', '/']):
-    # def __init__(self, interval, seq=['▖', '▘', '▝', '▗']):
-    # def __init__(self, interval, seq=['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█', '▇', '▆', '▅', '▄', '▃', '▁']):
-    # def __init__(self, interval, seq=['┤', '┘', '┴', '└', '├', '┌', '┬', '┐']):
-    # def __init__(self, interval, seq=['◢', '◣', '◤', '◥']):
-    # def __init__(self, interval, seq=['◡◡', '⊙⊙', '◠◠']):
-    # def __init__(self, interval, seq=['▉', '▊', '▋', '▌', '▍', '▎', '▏', '▎', '▍', '▌', '▋', '▊', '▉']):
-    # def __init__(self, interval, seq=['◴', '◷', '◶', '◵']):
-    # def __init__(self, interval, seq=['◐', '◓', '◑', '◒']):
-    def __init__(self, interval, seq=['⠁', '⠂', '⠄', '⡀', '⢀', '⠠', '⠐', '⠈']):
+
+    sequences = [
+        ['⠁', '⠂', '⠄', '⡀', '⢀', '⠠', '⠐', '⠈'],
+        ['-', '\\', '|', '/'],
+        ['▖', '▘', '▝', '▗'],
+        ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█', '▇', '▆', '▅', '▄', '▃', '▁'],
+        ['┤', '┘', '┴', '└', '├', '┌', '┬', '┐'],
+        ['◢', '◣', '◤', '◥'],
+        ['◡◡', '⊙⊙', '◠◠'],
+        ['▉', '▊', '▋', '▌', '▍', '▎', '▏', '▎', '▍', '▌', '▋', '▊', '▉'],
+        ['◴', '◷', '◶', '◵'],
+        ['◐', '◓', '◑', '◒']
+    ]
+
+    def __init__(self, interval, seqIdx=0):
         self.interval = interval # ms
-        self.seq      = seq
+        self.seqIdx   = seqIdx
         self.timer    = time.time()
         self.index    = 0
 
@@ -155,11 +160,15 @@ class GoSequence:
         currTime = time.time()
         if ((currTime - self.timer) * 1000) > self.interval:
             self.timer = currTime
-            self.index = (self.index + 1) % len(self.seq)
+            self.index = (self.index + 1) % len(self.sequences[self.seqIdx])
         return self.getLast()
 
     def getLast(self):
-        return self.seq[self.index]
+        return self.sequences[self.seqIdx][self.index]
+
+    def changeSequence(self):
+        self.seqIdx = (self.seqIdx + 1) % len(self.sequences)
+        self.index  = 0
 
 
 class PcanGui:
@@ -297,6 +306,7 @@ def runPcanGui(stdscr, refreshRate):
         elif key == ord('s'):                                                        gui.toggleSignals()
         elif key == ord('b'):                                                        gui.toggleBold()
         elif key == ord('c'):                                                        clearCanData = True
+        elif key == ord('z'):                                                        goSeq.changeSequence()
 
         key  = ord('0') if key in badKeys else key
         padY = max(0, min(padHeight-height, padY))
