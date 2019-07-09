@@ -316,7 +316,7 @@ def runPcanGui(stdscr, refreshRate):
             '[resume CAN]'  if pause             else '[pause CAN]',
             'hide'          if gui.showSignals() else 'show',
             padY, padHeight,
-            chr(key), key)
+            chr(key), key)[:width-1]
 
         stdscr.addnstr(0,        0, gui.title().ljust(width),    width, curses.color_pair(3) | gui.boldAttr())
         stdscr.addnstr(height-1, 0, statusbarStr.ljust(width-1), width, curses.color_pair(3) | gui.boldAttr())
