@@ -7,6 +7,7 @@ import curses
 import functools
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -27,10 +28,11 @@ pause       = False
 ###############################################################################
 
 class CanMsg:
-    def __init__(self, id, data, dlc, name=None, signals=[], showSigs=True):
+    def __init__(self, id, data, dlc, extended=False, name=None, signals=[], showSigs=True):
         self.id        = id
         self.name      = name
         self.count     = 0
+        self.extended  = extended
         self.time      = time.time()
         self.showSigs  = showSigs
         self.startTime = self.time
@@ -64,15 +66,15 @@ class CanMsg:
                  '--------|---|------------------------------------|--------------------------------------------|----------|---------|----------|-----------'])
 
     @staticmethod
-    def msgStrStart() -> str:
-        return ' 0x'
+    def lineIsMsg(line : str) -> bool:
+        return bool(re.match(r'^ \w+', line))
 
     def __str__(self):
         dataStr = binascii.hexlify(self.data).decode().upper()
         dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
 
         classStr = ' {:6} | {:1} | {:34.34} | {:42} | {:8} | {:7} | {:8.2f} | {:8.2f}\n{}'.format(
-            hex(self.id), self.dlc, str(self.name) if self.name else '', dataStr, self.ascii, self.count, time.time() - self.startTime, self.delta,
+            hex((self.id & ~0x80000000) if self.extended else self.id).lstrip('0x').upper(), self.dlc, str(self.name) if self.name else '', dataStr, self.ascii, self.count, time.time() - self.startTime, self.delta,
             '\n'.join([str(s) for s in self.signals]) + ('\n' if self.signals else '') if self.showSigs else '')
 
         return classStr
@@ -221,6 +223,9 @@ def receiveCan(canChannel, dbcFile):
         msg = bus.recv()
 
         try:
+            if msg.is_extended_id:
+                msg.arbitration_id |= 0x80000000
+
             decodedMsg = caneton.message_decode(message_id=msg.arbitration_id,
                                                 message_length=msg.dlc,
                                                 message_data=msg.data,
@@ -242,6 +247,7 @@ def receiveCan(canChannel, dbcFile):
             canData[msg.arbitration_id] = CanMsg(id=decodedMsg['id'],
                                                  data=decodedMsg['raw_data'],
                                                  dlc=msg.dlc,
+                                                 extended=msg.is_extended_id,
                                                  name=decodedMsg['name'],
                                                  signals=canetonSignalsToObj(msgId=decodedMsg['id'], rawSignals=decodedMsg['signals'], dbcJson=dbcJson))
         else:
@@ -329,7 +335,7 @@ def runPcanGui(stdscr, refreshRate):
 
         pad = curses.newpad(padHeight, 200)
         for line in canDataStr:
-            pad.addstr('{}\n'.format(line), curses.color_pair(0) | (gui.boldAttr() if line.startswith(CanMsg.msgStrStart()) else 0))
+            pad.addstr('{}\n'.format(line), curses.color_pair(0) | (gui.boldAttr() if CanMsg.lineIsMsg(line) else 0))
         pad.refresh(padY,0, 4,0, height-3,width-1)
 
         stdscr.refresh()
