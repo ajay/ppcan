@@ -215,6 +215,7 @@ def receiveCan(canChannel, dbcFile):
 
     while True:
         if pause:
+            time.sleep(0.1)
             continue
 
         msg = bus.recv()
