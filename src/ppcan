@@ -243,9 +243,10 @@ def runPcanGui(stdscr, refreshRate):
     gui   = PcanGui()
     goSeq = GoSequence(interval=100)
 
-    padHeight = 0
-    padY      = 0
-    key       = 0
+    padHeight    = 0
+    padY         = 0
+    key          = 0
+    clearCanData = False
 
     stdscr.clear()
     stdscr.refresh()
@@ -266,14 +267,17 @@ def runPcanGui(stdscr, refreshRate):
         for canId in sorted(canData.keys()):
             canData[canId].showSignals() if gui.showSignals() else canData[canId].hideSignals()
             canDataStr.append(str(canData[canId]))
+        if clearCanData:
+            canData.clear()
         canDataLock.release()
         canDataStr = ''.join(canDataStr).split('\n')
 
         height, width = stdscr.getmaxyx()
         padHeight = len(canDataStr) + len(gui.header())
 
-        if gui.signalsToggled() and padHeight < height:
+        if clearCanData or (gui.signalsToggled() and padHeight < height):
             stdscr.clear()
+            clearCanData = False
             gui.clearSignalsToggled()
 
         if   key == curses.KEY_RESIZE:                                               continue
@@ -286,11 +290,12 @@ def runPcanGui(stdscr, refreshRate):
         elif key == ord('p'):                                                        pause = not pause
         elif key == ord('s'):                                                        gui.toggleSignals()
         elif key == ord('b'):                                                        gui.toggleBold()
+        elif key == ord('c'):                                                        clearCanData = True
 
         key  = ord('0') if key in badKeys else key
         padY = max(0, min(padHeight-height, padY))
 
-        statusbarStr = " {} | 'q' [quit] | 'p' {:8} | 's' [{:4} signals] | 'b' [toggle bold] | {} / {} | '{}' ({})".format(
+        statusbarStr = " {} | 'q' [quit] | 'p' {:8} | 's' [{:4} signals] | 'b' [toggle bold] | 'c' [clear msgs] | {} / {} | '{}' ({})".format(
             goSeq.getLast() if pause             else goSeq.get(),
             '[resume]'      if pause             else '[pause]',
             'hide'          if gui.showSignals() else 'show',
