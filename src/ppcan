@@ -27,12 +27,12 @@ pause       = False
 ###############################################################################
 
 class CanMsg:
-    def __init__(self, id, data, dlc, name=None, signals=[]):
+    def __init__(self, id, data, dlc, name=None, signals=[], showSig=True):
         self.id      = id
         self.name    = name
         self.count   = 0
         self.time    = time.time()
-        self.showSig = True
+        self.showSig = showSig
 
         self.update(data=data, dlc=dlc, signals=signals)
 
@@ -155,6 +155,37 @@ class GoSequence:
     def getLast(self):
         return self.seq[self.index]
 
+
+class PcanGui:
+
+    _title      = 'Python PCAN!'
+    _headerYIdx = 2
+
+    def __init__(self, bold=True, showSignals=True):
+        self._boldAttr       = 0
+        self._showSignals    = True
+        self._signalsToggled = False
+
+        if bold:
+            self.toggleBold()
+
+    def title(self)          -> str:  return self._title
+    def header(self)         -> str:  return CanMsg.headerStrs()
+    def headerYIdx(self)     -> int:  return self._headerYIdx
+    def showSignals(self)    -> bool: return self._showSignals
+    def signalsToggled(self) -> bool: return self._signalsToggled
+    def boldAttr(self):               return self._boldAttr
+
+    def toggleBold(self):
+        self._boldAttr = 0 if self._boldAttr else curses.A_BOLD
+
+    def toggleSignals(self):
+        self._showSignals    = not self._showSignals
+        self._signalsToggled = True
+
+    def clearSignalsToggled(self):
+        self._signalsToggled = False
+
 ###############################################################################
 
 def receiveCan(canChannel, dbcFile):
@@ -202,18 +233,17 @@ def receiveCan(canChannel, dbcFile):
 
 ###############################################################################
 
-def pcanCursesGui(stdscr, refreshRate, bold=False):
+def runPcanGui(stdscr, refreshRate):
     global pause
 
-    badKeys      = [-1, 0, ord('\t'), ord('\r'), ord('\n')]
-    titleStr     = 'Python PCAN!'
-    headerStrIdx = 2
-    boldAttr     = curses.A_BOLD if bold else 0
+    badKeys = [-1, 0, ord('\t'), ord('\r'), ord('\n')]
+
+    gui   = PcanGui()
+    goSeq = GoSequence(interval=100)
 
     padHeight = 0
     padY      = 0
     key       = 0
-    goSeq     = GoSequence(interval=100)
 
     stdscr.clear()
     stdscr.refresh()
@@ -232,18 +262,17 @@ def pcanCursesGui(stdscr, refreshRate, bold=False):
         canDataStr = []
         canDataLock.acquire()
         for canId in sorted(canData.keys()):
-            if   key == ord('h'):
-                canData[canId].hideSignals()
-                stdscr.clear()
-            elif key == ord('s'):
-                canData[canId].showSignals()
-                stdscr.clear()
+            canData[canId].showSignals() if gui.showSignals() else canData[canId].hideSignals()
             canDataStr.append(str(canData[canId]))
         canDataLock.release()
         canDataStr = ''.join(canDataStr).split('\n')
 
         height, width = stdscr.getmaxyx()
-        padHeight = len(canDataStr) + len(CanMsg.headerStrs())
+        padHeight = len(canDataStr) + len(gui.header())
+
+        if gui.signalsToggled() and padHeight < height:
+            stdscr.clear()
+            gui.clearSignalsToggled()
 
         if   key == curses.KEY_RESIZE:                                               continue
         elif key == curses.KEY_DOWN:                                                 padY += 1
@@ -252,28 +281,29 @@ def pcanCursesGui(stdscr, refreshRate, bold=False):
         elif key == curses.KEY_LEFT  or key == curses.KEY_PPAGE:                     padY -= height
         elif key == curses.KEY_HOME:                                                 padY  = 0
         elif key == curses.KEY_END:                                                  padY  = padHeight
-        elif key == ord('p'):                                                        pause = True
-        elif key == ord('r'):                                                        pause = False
+        elif key == ord('p'):                                                        pause = not pause
+        elif key == ord('s'):                                                        gui.toggleSignals()
+        elif key == ord('b'):                                                        gui.toggleBold()
 
-        key = ord('0') if key in badKeys else key
-
+        key  = ord('0') if key in badKeys else key
         padY = max(0, min(padHeight-height, padY))
 
-        statusbarStr = " {} | 'q' [quit] | {:12} | 's' [show signals] | 'h' [hide signals] | {} / {} | '{}' ({})".format(goSeq.getLast() if pause else goSeq.get(),
-                                                                                                                         "'r' [resume]"  if pause else "'p' [pause]",
-                                                                                                                         padY, padHeight,
-                                                                                                                         chr(key), key)
+        statusbarStr = " {} | 'q' [quit] | 'p' {:8} | 's' [{:4} signals] | 'b' [toggle bold] | {} / {} | '{}' ({})".format(
+            goSeq.getLast() if pause             else goSeq.get(),
+            '[resume]'      if pause             else '[pause]',
+            'hide'          if gui.showSignals() else 'show',
+            padY, padHeight,
+            chr(key), key)
 
-        stdscr.addnstr(0, 0, titleStr.ljust(width), width, curses.color_pair(3) | boldAttr)
+        stdscr.addnstr(0,        0, gui.title().ljust(width),    width, curses.color_pair(3) | gui.boldAttr())
+        stdscr.addnstr(height-1, 0, statusbarStr.ljust(width-1), width, curses.color_pair(3) | gui.boldAttr())
 
-        for i in range(headerStrIdx, headerStrIdx + len(CanMsg.headerStrs())):
-            stdscr.addnstr(i, 0, CanMsg.headerStrs()[i-headerStrIdx], width, curses.color_pair(0) | boldAttr)
-
-        stdscr.addnstr(height-1, 0, statusbarStr.ljust(width-1), width, curses.color_pair(3) | boldAttr)
+        for i in range(gui.headerYIdx(), gui.headerYIdx() + len(gui.header())):
+            stdscr.addnstr(i, 0, gui.header()[i-gui.headerYIdx()], width, curses.color_pair(0) | gui.boldAttr())
 
         pad = curses.newpad(padHeight, 200)
         for line in canDataStr:
-            pad.addstr('{}\n'.format(line), curses.color_pair(0) | (boldAttr if line.startswith(CanMsg.msgStrStart()) else 0))
+            pad.addstr('{}\n'.format(line), curses.color_pair(0) | (gui.boldAttr() if line.startswith(CanMsg.msgStrStart()) else 0))
         pad.refresh(padY,0, 4,0, height-3,width-1)
 
         stdscr.refresh()
@@ -300,7 +330,6 @@ def main():
         type=validateRefreshRate,
         default=100,
         help=('Screen refresh rate in milliseconds, in multiples of 100ms (i.e. 100, 500, 1000, etc...). Slower refresh rates reduce cpu utilization. Possible values are 100ms-25500ms. Default is 100ms.'))
-    parser.add_argument('-b', '--bold', action='store_true', help='Display some items in bold for emphasis')
 
     requiredArgs = parser.add_argument_group('required arguments')
     requiredArgs.add_argument('-c', '--can_channel', help='Initialized SocketCAN CAN channel (i.e. can0, can1, vcan0, etc...)', required=True)
@@ -313,7 +342,7 @@ def main():
     receiveCanThread = threading.Thread(target=receiveCan, daemon=True, args=(args.can_channel, args.can_dbc))
     receiveCanThread.start()
 
-    curses.wrapper(functools.partial(pcanCursesGui, refreshRate=args.refresh_rate, bold=args.bold))
+    curses.wrapper(functools.partial(runPcanGui, refreshRate=args.refresh_rate))
 
 
 if __name__ =='__main__':
