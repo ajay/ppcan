@@ -27,12 +27,12 @@ pause       = False
 ###############################################################################
 
 class CanMsg:
-    def __init__(self, id, data, dlc, name=None, signals=[], showSig=True):
+    def __init__(self, id, data, dlc, name=None, signals=[], showSigs=True):
         self.id        = id
         self.name      = name
         self.count     = 0
         self.time      = time.time()
-        self.showSig   = showSig
+        self.showSigs  = showSigs
         self.startTime = self.time
 
         self.update(data=data, dlc=dlc, signals=signals)
@@ -53,10 +53,10 @@ class CanMsg:
         self.signals = signals
 
     def hideSignals(self):
-        self.showSig = False
+        self.showSigs = False
 
     def showSignals(self):
-        self.showSig = True
+        self.showSigs = True
 
     @staticmethod
     def headerStrs() -> str:
@@ -71,9 +71,9 @@ class CanMsg:
         dataStr = binascii.hexlify(self.data).decode().upper()
         dataStr = ' '.join(dataStr[i:i+2] for i in range(0, len(dataStr), 2))
 
-        classStr  = ' {:6} | {:1} | {:34.34} | {:42} | {:8} | {:7} | {:8.2f} | {:8.2f}\n'.format(
-            hex(self.id), self.dlc, str(self.name) if self.name else '', dataStr, self.ascii, self.count, time.time() - self.startTime, self.delta)
-        classStr += '\n'.join([str(s) for s in self.signals]) + ('\n' if self.signals else '') if self.showSig else ''
+        classStr = ' {:6} | {:1} | {:34.34} | {:42} | {:8} | {:7} | {:8.2f} | {:8.2f}\n{}'.format(
+            hex(self.id), self.dlc, str(self.name) if self.name else '', dataStr, self.ascii, self.count, time.time() - self.startTime, self.delta,
+            '\n'.join([str(s) for s in self.signals]) + ('\n' if self.signals else '') if self.showSigs else '')
 
         return classStr
 
@@ -96,9 +96,9 @@ class CanSignal:
             self.value = self.enums[value]
 
     def __str__(self):
-        if   self.enums and self.value != self.raw:     valueStr = '{:<3} {}'.format(int(self.raw), self.value)
-        elif isinstance(self.value, float):             valueStr = ('{:0.' + str(max(self.decimals, 0)) + 'f}').format(self.value)
-        else:                                           valueStr = str(self.value)
+        if   self.enums and self.value != self.raw:  valueStr = '{:<3} {}'.format(int(self.raw), self.value)
+        elif isinstance(self.value, float):          valueStr = ('{:0.' + str(max(self.decimals, 0)) + 'f}').format(self.value)
+        else:                                        valueStr = str(self.value)
 
         return ' {:6} | {:1} |   {:32.32} | {:<35.35} {:>6} |'.format('', '', self.name, valueStr, self.unit if self.unit else '')
 
@@ -121,7 +121,7 @@ class CanDbcJson:
         self.data = json.loads(open(tempDbcJson.name).read())
 
     def msgData(self, msgId : int):
-        return self.data['messages'][str(msgId)]
+        return self.data['messages'][str(msgId)] if str(msgId) in self.data['messages'] else None
 
     def signalData(self, msgId : int, signal : str):
         return self.msgData(msgId)['signals'][signal]
@@ -166,7 +166,7 @@ class GoSequence:
     def getLast(self):
         return self.sequences[self.seqIdx][self.index]
 
-    def changeSequence(self):
+    def cycle(self):
         self.seqIdx = (self.seqIdx + 1) % len(self.sequences)
         self.index  = 0
 
@@ -225,6 +225,8 @@ def receiveCan(canChannel, dbcFile):
                                                 message_length=msg.dlc,
                                                 message_data=msg.data,
                                                 dbc_json=dbcJson.data)
+            if msg.dlc != dbcJson.msgData(msg.arbitration_id)['length']:
+                raise caneton.exceptions.DecodingError
         except (caneton.exceptions.MessageNotFound, caneton.exceptions.DecodingError):
             decodedMsg = {
                 'id'                : msg.arbitration_id,
@@ -307,7 +309,7 @@ def runPcanGui(stdscr, refreshRate):
         elif key == ord('s'):                                                        gui.toggleSignals()
         elif key == ord('b'):                                                        gui.toggleBold()
         elif key == ord('c'):                                                        clearCanData = True
-        elif key == ord('z'):                                                        goSeq.changeSequence()
+        elif key == ord('z'):                                                        goSeq.cycle()
 
         key  = ord('0') if key in badKeys else key
         padY = max(0, min(padHeight-height, padY))
