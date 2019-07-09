@@ -327,11 +327,11 @@ def runPcanGui(stdscr, refreshRate):
             padY, padHeight,
             chr(key), key)[:width-1]
 
-        stdscr.addnstr(0,        0, gui.title().ljust(width),    width, curses.color_pair(3) | gui.boldAttr())
-        stdscr.addnstr(height-1, 0, statusbarStr.ljust(width-1), width, curses.color_pair(3) | gui.boldAttr())
-
         for i in range(gui.headerYIdx(), gui.headerYIdx() + len(gui.header())):
             stdscr.addnstr(i, 0, gui.header()[i-gui.headerYIdx()], width, curses.color_pair(0) | gui.boldAttr())
+
+        stdscr.addnstr(0,        0, gui.title().ljust(width),    width, curses.color_pair(3) | gui.boldAttr())
+        stdscr.addnstr(height-1, 0, statusbarStr.ljust(width-1), width, curses.color_pair(3) | gui.boldAttr())
 
         pad = curses.newpad(padHeight, 200)
         for line in canDataStr:
