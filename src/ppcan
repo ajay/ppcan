@@ -208,14 +208,13 @@ class PcanGui:
 
 ###############################################################################
 
-def receiveCan(canChannel, dbcFile):
+def receiveCan(dbcFile, bus):
 
     def canetonSignalsToObj(msgId : int, rawSignals : list, dbcJson : CanDbcJson) -> list:
         return [CanSignal(name=s['name'], value=s['value'], unit=s['unit'],
                           enums=dbcJson.signalEnums(msgId=msgId, signal=s['name']),
                           decimalPlaces=dbcJson.signalDecimalPlaces(msgId=msgId, signal=s['name'])) for s in filter(None, rawSignals)]
 
-    bus     = can.interfaces.socketcan.SocketcanBus(channel=canChannel)
     dbcJson = CanDbcJson(dbcPath=dbcFile)
 
     while True:
@@ -378,7 +377,14 @@ def main():
 
     signal.signal(signal.SIGINT, sigIntHandler)
 
-    receiveCanThread = threading.Thread(target=receiveCan, daemon=True, args=(args.can_channel, args.can_dbc))
+    try:
+        bus = can.interfaces.socketcan.SocketcanBus(channel=args.can_channel)
+        bus.recv(0.01)
+    except Exception as e:
+        print('{}Catastrophic Failure: Error instantiating CAN bus: {} {}'.format(colorama.Fore.RED, e, colorama.Style.RESET_ALL))
+        sys.exit(1)
+
+    receiveCanThread = threading.Thread(target=receiveCan, daemon=True, args=(args.can_dbc, bus))
     receiveCanThread.start()
 
     curses.wrapper(functools.partial(runPcanGui, refreshRate=args.refresh_rate))
