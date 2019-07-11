@@ -119,7 +119,10 @@ class CanDbcJson:
 
         tempDbcJson = tempfile.NamedTemporaryFile(mode='w+', encoding='utf-8')
         os.chdir(os.path.dirname(os.path.abspath(__file__)))
-        subprocess.call(['./dbc2json', tempUtf8Dbc.name, tempDbcJson.name], stdout=open(os.devnull, 'wb'))
+        p = subprocess.Popen(['./dbc2json', tempUtf8Dbc.name, tempDbcJson.name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        output, err = p.communicate()
+        if p.returncode != 0:
+            raise Exception(err.decode().strip('\n'))
 
         os.chdir(origCwd)
 
@@ -208,14 +211,12 @@ class PcanGui:
 
 ###############################################################################
 
-def receiveCan(dbcFile, bus):
+def receiveCan(bus, dbcJson : CanDbcJson):
 
     def canetonSignalsToObj(msgId : int, rawSignals : list, dbcJson : CanDbcJson) -> list:
         return [CanSignal(name=s['name'], value=s['value'], unit=s['unit'],
                           enums=dbcJson.signalEnums(msgId=msgId, signal=s['name']),
                           decimalPlaces=dbcJson.signalDecimalPlaces(msgId=msgId, signal=s['name'])) for s in filter(None, rawSignals)]
-
-    dbcJson = CanDbcJson(dbcPath=dbcFile)
 
     while True:
         if pause:
@@ -384,7 +385,13 @@ def main():
         print('{}Catastrophic Failure: Error instantiating CAN bus: {} {}'.format(colorama.Fore.RED, e, colorama.Style.RESET_ALL))
         sys.exit(1)
 
-    receiveCanThread = threading.Thread(target=receiveCan, daemon=True, args=(args.can_dbc, bus))
+    try:
+        dbcJson = CanDbcJson(dbcPath=args.can_dbc)
+    except Exception as e:
+        print('{}Catastrophic Failure: Error loading DBC file: {} {}'.format(colorama.Fore.RED, e, colorama.Style.RESET_ALL))
+        sys.exit(1)
+
+    receiveCanThread = threading.Thread(target=receiveCan, daemon=True, args=(bus, dbcJson))
     receiveCanThread.start()
 
     curses.wrapper(functools.partial(runPcanGui, refreshRate=args.refresh_rate))
